@@ -19,6 +19,7 @@ import functools
 import hashlib
 import locale
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -46,6 +47,11 @@ MODELS = {
 }
 DEFAULT_MODEL = "Qwen2.5-1.5B-Instruct"
 MODELS_DIR = Path.home() / "models"
+
+# The models' own markers, such as Qwen's end of turn <|im_end|>, Llama's
+# <|eot_id|> or DeepSeek's <｜end▁of▁sentence｜>: HailoRT streams the one
+# that ends an answer as a token, and it is not part of the answer.
+SPECIAL_TOKEN = re.compile(r"<[|｜][^<>|｜\s]+[|｜]>")
 
 HOT_C = 90  # above about this, the chip needs a break
 TEMPERATURE_EVERY_S = 5  # how often the idle chat reads the chip's temperature
@@ -313,7 +319,9 @@ class Chat:
                 if first is None:
                     first = last
                 count += 1
-                on_token(token)
+                token = SPECIAL_TOKEN.sub("", token)
+                if token:
+                    on_token(token)
                 if should_stop():
                     result = "stopped"
                     break
